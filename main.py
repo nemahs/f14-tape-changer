@@ -6,8 +6,10 @@ from typing import List, Set, Optional
 from PyQt5 import QtWidgets, uic, QtGui, QtCore
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QListWidgetItem as ListItem
+from PyQt5.QtWidgets import QMessageBox as MsgBox
 
-SONGTITLES = [f"Song{x}.ogg" for x in range(1,11)]
+SONG_TITLES: List[str] = [f"Song{x}.ogg" for x in range(1,11)]
+DEFAULT_FOLDER: str = "Default"
 
 class Main(QtWidgets.QMainWindow):
     """Main class for the Qt front end"""
@@ -62,32 +64,77 @@ class Main(QtWidgets.QMainWindow):
 
             for fd in os.scandir():
                 if fd.is_dir(follow_symlinks=False):
-                    logging.info("Found {fd.name}")
+                    logging.info(f"Found {fd.name}")
                     newItem = QtWidgets.QListWidgetItem()
                     newItem.setText(f"  {fd.name}")
                     newItem.path = fd.name
                     
                     self.tapePicker.addItem(newItem)
 
-            self.updateLoadedTape(self.determineLoadedTape())
+            if self.isConfigured():
+                self.updateLoadedTape(self.determineLoadedTape())
+            else:
+                msgBox = MsgBox()
+                msgBox.setWindowTitle("Convert Walkman folder?")
+                msgBox.setText("It looks like your walkman folder isn't configured yet. Should I configure it?")
+                msgBox.setStandardButtons(MsgBox.Yes | MsgBox.No)
+                if msgBox.exec() == MsgBox.Yes:
+                    self.convertFolder()
 
+    def convertFolder(self) -> None:
+        """
+        Converts the F-14 walkman folder into a format we can use without deleting the built-in music.
+        """
+
+        if not os.path.exists(DEFAULT_FOLDER):
+            os.mkdir(DEFAULT_FOLDER)
+
+        for song in SONG_TITLES:
+            if os.path.isfile(song) and not os.path.islink(song):
+                os.replace(song, f"{DEFAULT_FOLDER}/{song}")
+                self.linkSong(song, DEFAULT_FOLDER)
+        self.updateLoadedTape(self.getListItem(DEFAULT_FOLDER))
+
+    def getListItem(self, name: str) -> Optional[ListItem]:
+        selectedTapes: List[ListItem] = self.tapePicker.findItems(f"[\*, ] {name}", QtCore.Qt.MatchRegularExpression)
+
+        if selectedTapes:
+            return selectedTapes[0]
+        return None
+
+
+    def linkSong(self, song: str, tape: str) -> None:
+        os.symlink(f"{tape}\\{song}", song)
+
+    def isConfigured(self) -> bool:
+        """
+        Determines if the walkman is configured correctly for the switcher.
+        @return True if configured correctly, False otherwise
+        """
+        for song in SONG_TITLES:
+            if not os.path.islink(song) or not os.path.exists(song):
+                logging.info(f"{song} was not a link, folder is not configured properly")
+                return False
+        return True
+    
     def determineLoadedTape(self) -> ListItem:
         """
         Determines the currently loaded tape by checking the symlink paths
 
         @warn This only works if the folder is configured properly
-        @return loaded tape
+        @return Loaded tape
         """
         tapes: Set[str] = set()
+
+        if not self.isConfigured():
+            return False
         
-        for song in SONGTITLES:
-            if os.path.islink(song):
-                tape, __ = os.readlink(song).split('\\')
-                tapes.add(tape)
+        for song in SONG_TITLES:
+            tape, __ = os.readlink(song).split('\\')
+            tapes.add(tape)
 
         if len(tapes) == 1:
-            selectedTape: List[ListItem] = self.tapePicker.findItems(f"[\*, ] {tapes.pop()}", QtCore.Qt.MatchRegularExpression)
-            return selectedTape[0]
+            return self.getListItem(tapes.pop())
         return None
 
     def loadTape(self) -> None:
@@ -102,11 +149,11 @@ class Main(QtWidgets.QMainWindow):
 
 
         # TODO Check for symlinks to make sure we don't clobber anything. Needs a convert function though
-        for song in SONGTITLES:
+        for song in SONG_TITLES:
             logging.info(f"Replacing {song}")
             if os.path.exists(song):
                 os.remove(song)
-            os.symlink(f"{tapeToLoad.path}\\{song}", song)
+            self.linkSong(song, tapeToLoad.path)
 
         self.updateLoadedTape(tapeToLoad)
        
