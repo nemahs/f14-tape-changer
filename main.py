@@ -40,6 +40,7 @@ class Main(QtWidgets.QMainWindow):
 
         @param tape Currently loaded tape
         """
+        logging.info(f"Setting {tape.path} as the selected tape")
         tape.setText(f"* {tape.path}")
         if self.loadedTape:
             self.loadedTape.setText(f"  {self.loadedTape.name}")
@@ -61,6 +62,7 @@ class Main(QtWidgets.QMainWindow):
 
             for fd in os.scandir():
                 if fd.is_dir(follow_symlinks=False):
+                    logging.info("Found {fd.name}")
                     newItem = QtWidgets.QListWidgetItem()
                     newItem.setText(f"  {fd.name}")
                     newItem.path = fd.name
@@ -84,7 +86,7 @@ class Main(QtWidgets.QMainWindow):
                 tapes.add(tape)
 
         if len(tapes) == 1:
-            selectedTape: ListItem = self.tapePicker.findItems(f"[\*, ] {tapes.pop()}", QtCore.Qt.MatchRegularExpression)
+            selectedTape: List[ListItem] = self.tapePicker.findItems(f"[\*, ] {tapes.pop()}", QtCore.Qt.MatchRegularExpression)
             return selectedTape[0]
         return None
 
@@ -95,12 +97,13 @@ class Main(QtWidgets.QMainWindow):
         tapeToLoad = self.tapePicker.currentItem()
 
         if not tapeToLoad:
+            logging.warn("No tape was selected to load!")
             return
 
 
         # TODO Check for symlinks to make sure we don't clobber anything. Needs a convert function though
         for song in SONGTITLES:
-            print(f"Replacing {song}")
+            logging.info(f"Replacing {song}")
             if os.path.exists(song):
                 os.remove(song)
             os.symlink(f"{tapeToLoad.path}\\{song}", song)
@@ -109,6 +112,7 @@ class Main(QtWidgets.QMainWindow):
        
 
 if __name__ == "__main__":
+    logging.basicConfig(filename='TapeChanger.log', level=logging.DEBUG)
     app = QApplication([])
     window = Main()
     # ...
