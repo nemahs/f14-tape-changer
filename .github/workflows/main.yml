@@ -4,11 +4,9 @@ name: CI
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: release
+    
+
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -29,3 +27,21 @@ jobs:
   
     - name: Build for Windows
       run: pyinstaller main.py
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: windows-build
+        path: dist/
+      
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: windows-build
+          
+      - run: cat $GITHUB_EVENT_PATH
+      
