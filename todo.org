@@ -1,0 +1,6 @@
+#+TODO IDEA TODO DOING DONE
+
+* DOING - Allow swapping of created mix tapes
+* IDEA - Allow creation of mix tapes from given files
+* IDEA - Allow creation of mixtapes from online sources
+** Should download and convert songs automatically using a web API
